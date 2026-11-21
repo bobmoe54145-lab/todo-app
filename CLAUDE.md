@@ -13,11 +13,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 作る順番：
 1. アプリ本体と自動テスト（完了）
-2. Google のサービスアカウントとシートを用意して、本物のシートで確認（作業中）
-3. GitHub（公開リポジトリ）に push、Vercel で公開
+2. Google のサービスアカウントとシートを用意して、本物のシートで確認（完了）
+3. GitHub（公開リポジトリ）に push、Vercel で公開（完了 2026-11-21）
 
-公開先：（未定）
-GitHub：（未作成・公開リポジトリにする）
+公開先：https://todo-app-ten-chi-73.vercel.app
+GitHub：https://github.com/bobmoe54145-lab/todo-app（公開）
 
 ## Commands
 
@@ -40,6 +40,10 @@ GitHub：（未作成・公開リポジトリにする）
 - 鍵：手元は `GOOGLE_SERVICE_ACCOUNT_FILE`（ファイルの場所）、Vercel は `GOOGLE_SERVICE_ACCOUNT_JSON`（中身）。
 
 ## ハマりどころ
+
+- 鍵は Google Cloud の「Default Gemini Project」で作ったサービスアカウント（Sheets API はそこで有効）。
+- Vercel の環境変数は `vercel env add <名前> production` に標準入力で渡した（鍵は `--sensitive`）。`vercel link` が `.env.local` を作るので `.vercelignore` にも入れた。
+- 本番 URL は `todo-app-ten-chi-73.vercel.app`。`todo-app-moe-projects1.vercel.app` は Deployment Protection で 302 になる。
 
 - `.wrap { padding: 0 16px }` が `main { padding-top }` を打ち消していたので `main.wrap` にした。
 - ブラウザ拡張でウィンドウを狭くできないので、スマホ幅の確認は幅 375px の iframe に入れたページで行った。
