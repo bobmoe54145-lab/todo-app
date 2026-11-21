@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}{{ '登録' if mode == 'new' else '編集' }} | やることリスト{% endblock %}
+{% block content %}
+<div class="narrow">
+<div class="page-head">
+  <h1>{{ 'やることを登録' if mode == 'new' else 'やることを編集' }}</h1>
+</div>
+
+{% if errors %}
+<ul class="errors">
+  {% for e in errors %}<li>{{ e }}</li>{% endfor %}
+</ul>
+{% endif %}
+
+<form method="post" class="todo-form"
+      action="{{ url_for('new') if mode == 'new' else url_for('edit', todo_id=todo.id) }}">
+  <label>
+    <span>タイトル <em class="required">必須</em></span>
+    <input type="text" name="title" value="{{ todo.title }}" maxlength="100" required autofocus>
+  </label>
+  <label>
+    <span>内容</span>
+    <textarea name="content" rows="6" maxlength="2000">{{ todo.content }}</textarea>
+  </label>
+  <label>
+    <span>期日</span>
+    <input type="date" name="due_date" value="{{ todo.due_date }}">
+  </label>
+  <div class="form-actions">
+    <a class="btn" href="{{ url_for('index') }}">キャンセル</a>
+    <button class="btn primary" type="submit">{{ '登録する' if mode == 'new' else '保存する' }}</button>
+  </div>
+</form>
+</div>
+{% endblock %}

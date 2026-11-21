@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head">
+  <h1>一覧 <span class="count">{{ todos|length }}件</span></h1>
+  <a class="btn primary" href="{{ url_for('new') }}">＋ 登録する</a>
+</div>
+
+{% if request.args.get('saved') == 'added' %}
+  <p class="notice">登録しました。</p>
+{% elif request.args.get('saved') == 'updated' %}
+  <p class="notice">保存しました。</p>
+{% endif %}
+
+{% if todos %}
+<table class="todo-table">
+  <thead>
+    <tr><th class="col-due">期日</th><th class="col-title">タイトル</th><th>内容</th><th class="col-action"></th></tr>
+  </thead>
+  <tbody>
+  {% for t in todos %}
+    {% set status = t.due_date|due_status %}
+    <tr class="{{ status }}">
+      <td class="col-due" data-label="期日">
+        {% if t.due_date %}{{ t.due_date|due_label }}{% else %}<span class="muted">なし</span>{% endif %}
+        {% if status == 'overdue' %}<span class="tag overdue">期限切れ</span>{% elif status == 'today' %}<span class="tag today">今日</span>{% endif %}
+      </td>
+      <td class="col-title">{{ t.title }}</td>
+      <td class="col-content">{{ t.content }}</td>
+      <td class="col-action"><a class="btn small" href="{{ url_for('edit', todo_id=t.id) }}">編集</a></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="empty">
+  <p>まだ、やることがありません。</p>
+  <a class="btn primary" href="{{ url_for('new') }}">＋ 最初のやることを登録する</a>
+</div>
+{% endif %}
+{% endblock %}
