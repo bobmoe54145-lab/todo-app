@@ -232,7 +232,7 @@ def test_すべて表示は種類ごとに分かれる(client):
 
 def with_ctx(fn):
     from app import create_app
-    app = create_app(store_factory=lambda: TodoStore(FakeWorksheet()))
+    app = create_app(store_factory=lambda: TodoStore(FakeWorksheet()), testing=True)
     with app.test_request_context("/"):
         fn()
 
@@ -328,9 +328,8 @@ def test_名前はToDoリスト(client):
     assert "<title>ToDoリスト</title>" in page and "やることリスト" not in page
 
 
-def test_シートを手で直して日付が崩れても一覧は表示できる(sheet):
-    from app import create_app
-    store = TodoStore(sheet)
+def test_シートを手で直して日付が崩れても一覧は表示できる(client, sheet):
+    TodoStore(sheet)
     sheet.rows.append(["abc", "手で足した", "", "日", "来月くらい", "", "", ""])
-    res = create_app(store_factory=lambda: store).test_client().get("/?d=all")
+    res = client.get("/?d=all")
     assert res.status_code == 200 and "来月くらい" in res.text

@@ -55,13 +55,59 @@ class FakeWorksheet:
                 target[col + c_off] = str(v)
 
 
+ME = "me@example.com"
+PASSWORD = "correct-horse-battery"
+
+
+@pytest.fixture(autouse=True)
+def login_env(monkeypatch):
+    """テスト用のログイン設定（本物の値は使わない）"""
+    from werkzeug.security import generate_password_hash
+    monkeypatch.setenv("ALLOWED_EMAILS", f"{ME}, second@example.com")
+    monkeypatch.setenv("LOGIN_PASSWORD_HASH", generate_password_hash(PASSWORD))
+    monkeypatch.delenv("GOOGLE_CLIENT_ID", raising=False)
+    monkeypatch.delenv("GOOGLE_CLIENT_SECRET", raising=False)
+    monkeypatch.delenv("VERCEL", raising=False)
+    monkeypatch.delenv("SECRET_KEY", raising=False)
+
+
+class CsrfClient:
+    """POST のときに合言葉（csrf_token）を自動で付けるテスト用のブラウザ"""
+
+    def __init__(self, client):
+        self._c = client
+        with client.session_transaction() as s:
+            s["csrf"] = "test-token"
+
+    def post(self, *args, data=None, **kwargs):
+        data = dict(data or {})
+        data.setdefault("csrf_token", "test-token")
+        return self._c.post(*args, data=data, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(self._c, name)
+
+
 @pytest.fixture
 def sheet():
     return FakeWorksheet()
 
 
 @pytest.fixture
-def client(sheet):
-    app = create_app(store_factory=lambda: TodoStore(sheet))
-    app.config["TESTING"] = True
-    return app.test_client()
+def app(sheet):
+    return create_app(store_factory=lambda: TodoStore(sheet), testing=True)
+
+
+@pytest.fixture
+def anon(app):
+    """ログインしていない人"""
+    return CsrfClient(app.test_client())
+
+
+@pytest.fixture
+def client(app):
+    """ログインしている人"""
+    c = CsrfClient(app.test_client())
+    with c.session_transaction() as s:
+        s["user"] = ME
+    return c

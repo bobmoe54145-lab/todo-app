@@ -6,6 +6,7 @@
   /todos/<id>/edit     ToDo の編集
   /todos/<id>/done     完了にする（POST）
   /todos/<id>/undo     完了を元に戻す（POST）
+  /login               ログイン（auth.py）
 
 ToDo の種類（kind）：
   day   その日にやる。その日だけ出る
@@ -25,7 +26,9 @@ from datetime import date, datetime, timedelta
 
 from dotenv import load_dotenv
 from flask import Flask, abort, redirect, render_template, request, url_for
+from werkzeug.middleware.proxy_fix import ProxyFix
 
+from auth import init_auth
 from sheets import JST, TodoStore, open_worksheet
 
 load_dotenv()
@@ -290,9 +293,13 @@ def build_groups(todos: list[dict], selected: date | None, today: date) -> list[
     return groups
 
 
-def create_app(store_factory=None) -> Flask:
+def create_app(store_factory=None, testing: bool = False) -> Flask:
     """store_factory：保存先を作る関数。テストでは偽物のシートを渡す。"""
     app = Flask(__name__)
+    app.config["TESTING"] = testing
+    # 公開先（Vercel）は前に中継サーバーがあるので、https や URL を正しく受け取るための設定
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+    init_auth(app)
     make_store = store_factory or (lambda: TodoStore(open_worksheet()))
     cache = {}
 

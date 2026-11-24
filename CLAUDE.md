@@ -18,6 +18,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 4. 完了ボタン・カレンダー（週の帯＋月表示）・日本語の見出し（完了 2026-11-24）
 5. 今日を選んでいるときは期限切れも見出しを分けて上に出す（完了 2026-11-24）
 6. 名前を「ToDoリスト」に、デザインを「生成り × えんじ」（配色3案から案1）に。ToDo を「その日／週の中／月の中」の3種類に分けた（完了 2026-11-24）。見本 Artifact：https://claude.ai/artifact/AKH7udCg159mLKD7PRqZ7P
+7. ログイン（Google ＋ メールとパスワード、許可したアドレスだけ。使うのは本人だけ）（2026-11-24）
 
 公開先：https://todo-app-ten-chi-73.vercel.app
 GitHub：https://github.com/bobmoe54145-lab/todo-app（公開）
@@ -25,7 +26,8 @@ GitHub：https://github.com/bobmoe54145-lab/todo-app（公開）
 ## Commands
 
 - `uv sync` — 必要なものを入れる
-- `uv run python app.py` — 手元で起動（http://127.0.0.1:5001）
+- `uv run python app.py` — 手元で起動（http://localhost:5001。Google ログインのリダイレクト URI がこのアドレス）
+- `uv run python scripts/setup_login.py` — ログインの設定（本人がターミナルで実行）
 - `uv run pytest` — 自動テスト（偽物のシート `tests/conftest.py` の FakeWorksheet を使う）
 - `npx vercel@latest --prod --yes` — 公開
 
@@ -46,6 +48,7 @@ GitHub：https://github.com/bobmoe54145-lab/todo-app（公開）
 - 登録画面の日付・週・月の欄の切りかえは CSS の `:has()` だけで行う（JS なし）。
 - 列を増やすときは `sheets.HEADERS`/`KEYS`・`add`/`update` の範囲・見出しの範囲（A1:H1）・テンプレート・テストを一緒に直す。
 - 2026-11-24 に本物のシートを2回移行した：見出しを英語→日本語、そのあと `migrate_add_kind()` で「種類」の列を D に挿入（どちらも移行前のコピーをバックアップのタブに残した）。
+- ログインは `auth.py`。全ページ（ログイン画面と static 以外）で `before_request` がログインを確かめる。POST にはすべて `csrf_token` が必要（テンプレートで `{{ csrf_token() }}`、テストは `CsrfClient` が自動で付ける）。環境変数：SECRET_KEY / ALLOWED_EMAILS / LOGIN_PASSWORD_HASH / GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET。設定は本人が `scripts/setup_login.py` で行う（パスワードは Claude が見ない・扱わない）。
 - 鍵：手元は `GOOGLE_SERVICE_ACCOUNT_FILE`（ファイルの場所）、Vercel は `GOOGLE_SERVICE_ACCOUNT_JSON`（中身）。
 
 ## ハマりどころ
