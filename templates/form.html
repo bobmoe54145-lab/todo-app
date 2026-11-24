@@ -13,7 +13,7 @@
 {% endif %}
 
 <form method="post" class="todo-form"
-      action="{{ url_for('new') if mode == 'new' else url_for('edit', todo_id=todo.id) }}">
+      action="{{ url_for('new', **nav) if mode == 'new' else url_for('edit', todo_id=todo.id, **nav) }}">
   <label>
     <span>タイトル <em class="required">必須</em></span>
     <input type="text" name="title" value="{{ todo.title }}" maxlength="100" required autofocus>
@@ -27,7 +27,7 @@
     <input type="date" name="due_date" value="{{ todo.due_date }}">
   </label>
   <div class="form-actions">
-    <a class="btn" href="{{ url_for('index') }}">キャンセル</a>
+    <a class="btn" href="{{ url_for('index', **nav) }}">キャンセル</a>
     <button class="btn primary" type="submit">{{ '登録する' if mode == 'new' else '保存する' }}</button>
   </div>
 </form>
