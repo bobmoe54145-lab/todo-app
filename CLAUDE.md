@@ -18,6 +18,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 4. 完了ボタン・カレンダー（週の帯＋月表示）・日本語の見出し（完了 2026-11-24）
 5. 今日を選んでいるときは期限切れも見出しを分けて上に出す（完了 2026-11-24）
 6. 名前を「ToDoリスト」に、デザインを「生成り × えんじ」（配色3案から案1）に。ToDo を「その日／週の中／月の中」の3種類に分けた（完了 2026-11-24）。見本 Artifact：https://claude.ai/artifact/AKH7udCg159mLKD7PRqZ7P
+- ログイン（Google ＋ メールとパスワード）を一度作ったが、設定の前にユーザーが「今回はやめる」と決めたので取り消した（2026-11-24、コミット d1cb21c を revert）。また入れるときは d1cb21c を戻せば復活する。
 
 公開先：https://todo-app-ten-chi-73.vercel.app
 GitHub：https://github.com/bobmoe54145-lab/todo-app（公開）
