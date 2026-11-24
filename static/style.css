@@ -74,6 +74,10 @@ h1 { font-size: 22px; margin: 0; }
 .count.zero { visibility: hidden; }
 
 /* やることのカード */
+.group-head { font-size: 15px; margin: 4px 0 8px; display: flex; align-items: baseline; gap: 2px; }
+.group-head.overdue { color: var(--danger); }
+.cards + .group-head { margin-top: 20px; }
+.group-empty { margin: 0; padding: 14px 16px; background: var(--card); border: 1px dashed var(--line); border-radius: 10px; color: var(--muted); font-size: 14px; }
 .list-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
 .list-head h2 { font-size: 18px; margin: 0; }
 .count-text { font-size: 14px; color: var(--muted); font-weight: normal; margin-left: 4px; }

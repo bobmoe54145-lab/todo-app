@@ -194,6 +194,11 @@ def create_app(store_factory=None) -> Flask:
             shown = [t for t in todos if t["due_date"] == cal["selected"].isoformat()]
         else:
             shown = todos
+        # 今日を選んでいるときは、期限切れのやることも上に出す（期日が古い順）
+        overdue = []
+        if cal["selected"] == today_jst():
+            today_key = today_jst().isoformat()
+            overdue = [t for t in todos if parse_date(t["due_date"]) and t["due_date"] < today_key]
         # 完了した直後なら「元に戻す」を出す
         done_todo = None
         done_id = request.args.get("done")
@@ -202,7 +207,7 @@ def create_app(store_factory=None) -> Flask:
             if t and t["done_at"]:
                 done_todo = t
         return render_template(
-            "index.html", cal=cal, todos=shown, nav=nav, done_todo=done_todo,
+            "index.html", cal=cal, todos=shown, overdue=overdue, nav=nav, done_todo=done_todo,
             all_url=url_for("index", **{**nav, "d": "all"}),
         )
 

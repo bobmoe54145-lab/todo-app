@@ -16,6 +16,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 2. Google のサービスアカウントとシートを用意して、本物のシートで確認（完了）
 3. GitHub（公開リポジトリ）に push、Vercel で公開（完了 2026-11-21）
 4. 完了ボタン・カレンダー（週の帯＋月表示）・日本語の見出し（完了 2026-11-24）
+5. 今日を選んでいるときは期限切れも見出しを分けて上に出す（完了 2026-11-24）
 
 公開先：https://todo-app-ten-chi-73.vercel.app
 GitHub：https://github.com/bobmoe54145-lab/todo-app（公開）

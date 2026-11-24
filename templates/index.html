@@ -1,5 +1,25 @@
 {% extends "base.html" %}
 {% macro nav_fields() %}{% for k, v in nav.items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}{% endmacro %}
+{% macro card(t) %}
+      {% set status = t.due_date|due_status %}
+      <article class="card {{ status }}">
+        <div class="card-main">
+          <div class="meta">
+            {% if t.due_date %}{{ t.due_date|due_label }}{% else %}期日なし{% endif %}
+            {% if status == 'overdue' %}<span class="tag overdue">期限切れ</span>{% elif status == 'today' %}<span class="tag today">今日</span>{% endif %}
+          </div>
+          <h3 class="title">{{ t.title }}</h3>
+          {% if t.content %}<p class="content">{{ t.content }}</p>{% endif %}
+        </div>
+        <div class="actions">
+          <form method="post" action="{{ url_for('done', todo_id=t.id) }}">
+            {{ nav_fields() }}
+            <button class="btn small done" type="submit">完了</button>
+          </form>
+          <a class="btn small" href="{{ url_for('edit', todo_id=t.id, **nav) }}">編集</a>
+        </div>
+      </article>
+{% endmacro %}
 {% block content %}
 <div class="page-head">
   <h1>一覧</h1>
@@ -47,36 +67,24 @@
 <section class="list">
   <div class="list-head">
     {% if cal.selected %}
-      <h2>{{ cal.selected.isoformat()|due_label }}のやること <span class="count-text">{{ todos|length }}件</span></h2>
+      <h2>{{ cal.selected.isoformat()|due_label }}のやること{% if not overdue %} <span class="count-text">{{ todos|length }}件</span>{% endif %}</h2>
       <a class="btn small" href="{{ all_url }}">すべて表示</a>
     {% else %}
       <h2>すべてのやること <span class="count-text">{{ todos|length }}件</span></h2>
     {% endif %}
   </div>
 
+  {% if overdue %}
+  <h3 class="group-head overdue">期限切れ <span class="count-text">{{ overdue|length }}件</span></h3>
+  <div class="cards">{% for t in overdue %}{{ card(t) }}{% endfor %}</div>
+  <h3 class="group-head">今日 <span class="count-text">{{ todos|length }}件</span></h3>
   {% if todos %}
-  <div class="cards">
-    {% for t in todos %}
-      {% set status = t.due_date|due_status %}
-      <article class="card {{ status }}">
-        <div class="card-main">
-          <div class="meta">
-            {% if t.due_date %}{{ t.due_date|due_label }}{% else %}期日なし{% endif %}
-            {% if status == 'overdue' %}<span class="tag overdue">期限切れ</span>{% elif status == 'today' %}<span class="tag today">今日</span>{% endif %}
-          </div>
-          <h3 class="title">{{ t.title }}</h3>
-          {% if t.content %}<p class="content">{{ t.content }}</p>{% endif %}
-        </div>
-        <div class="actions">
-          <form method="post" action="{{ url_for('done', todo_id=t.id) }}">
-            {{ nav_fields() }}
-            <button class="btn small done" type="submit">完了</button>
-          </form>
-          <a class="btn small" href="{{ url_for('edit', todo_id=t.id, **nav) }}">編集</a>
-        </div>
-      </article>
-    {% endfor %}
-  </div>
+  <div class="cards">{% for t in todos %}{{ card(t) }}{% endfor %}</div>
+  {% else %}
+  <p class="group-empty">今日が期日のやることはありません。</p>
+  {% endif %}
+  {% elif todos %}
+  <div class="cards">{% for t in todos %}{{ card(t) }}{% endfor %}</div>
   {% else %}
   <div class="empty">
     <p>{{ 'この日のやることはありません。' if cal.selected else 'やることはありません。' }}</p>

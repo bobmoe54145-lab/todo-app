@@ -219,3 +219,35 @@ def with_app_context(fn):
     app = create_app(store_factory=lambda: TodoStore(FakeWorksheet()))
     with app.test_request_context("/"):
         fn()
+
+
+# ---- 今日の一覧に期限切れも出す ----
+
+def test_今日の一覧には期限切れも見出しを分けて出る(client):
+    add(client, "おととい", today(-2))
+    add(client, "きのう", today(-1))
+    add(client, "今日のこと", today(0))
+    add(client, "明日のこと", today(1))
+    page = client.get("/").text
+    assert "期限切れ" in page and "2件" in page
+    assert page.index("おととい") < page.index("きのう") < page.index('class="group-head">今日') < page.index("今日のこと")
+    assert "明日のこと" not in page
+
+
+def test_今日のやることがなくても期限切れは出る(client):
+    add(client, "きのう", today(-1))
+    page = client.get("/").text
+    assert "きのう" in page and "今日が期日のやることはありません" in page
+
+
+def test_他の日を選んだときは期限切れを出さない(client):
+    add(client, "きのう", today(-1))
+    add(client, "明日のこと", today(1))
+    page = client.get(f"/?d={today(1)}").text
+    assert "明日のこと" in page and "きのう" not in page
+
+
+def test_期限切れがなければ今までどおり(client):
+    add(client, "今日のこと", today(0))
+    page = client.get("/").text
+    assert "group-head" not in page and "今日のこと" in page
