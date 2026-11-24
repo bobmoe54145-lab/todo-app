@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% macro nav_fields() %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% for k, v in nav.items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}{% endmacro %}
+{% macro nav_fields() %}{% for k, v in nav.items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}{% endmacro %}
 {% macro item(t) %}
   {% set over = t|is_overdue %}
   <article class="item{% if over %} overdue{% endif %}">

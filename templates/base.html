@@ -13,15 +13,7 @@
   <header class="site-header">
     <div class="bar">
       <a class="logo" href="{{ url_for('index') }}">ToDoリスト</a>
-      <div class="bar-actions">
-        {% block header_action %}<a class="btn fill" href="{{ url_for('new', **(nav or {})) }}">＋ 登録</a>{% endblock %}
-        {% if session.get('user') %}
-        <form method="post" action="{{ url_for('logout') }}">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button class="btn text" type="submit">ログアウト</button>
-        </form>
-        {% endif %}
-      </div>
+      {% block header_action %}<a class="btn fill" href="{{ url_for('new', **(nav or {})) }}">＋ 登録</a>{% endblock %}
     </div>
   </header>
   <main class="wrap">

@@ -7,8 +7,6 @@ ToDo（タイトル・内容・いつやるか）を登録・編集し、一覧�
 
 ## できること
 
-- ログイン（Google アカウント、またはメールアドレスとパスワード）。許可したアドレスだけが入れる。ログインは30日間続く
-
 - ToDo の登録・編集。「いつやる？」を3つから選ぶ
   - **その日に**：日付を決める。その日だけ一覧に出る
   - **週の中で**：週（日曜〜土曜）を選ぶ。その週の毎日、完了するまで出る
@@ -43,18 +41,11 @@ ToDo（タイトル・内容・いつやるか）を登録・編集し、一覧�
 3. スプレッドシートを作り、サービスアカウントのメールアドレス（`…@…iam.gserviceaccount.com`）に**編集者**で共有する
 4. `.env.example` をコピーして `.env` を作り、`SPREADSHEET_ID` を入れる
 
-## ログインの設定
-
-1. Google Cloud で OAuth 同意画面と OAuth クライアント ID（ウェブ アプリケーション）を作る。承認済みのリダイレクト URI：
-   - `https://todo-app-ten-chi-73.vercel.app/auth/google/callback`
-   - `http://localhost:5001/auth/google/callback`
-2. ターミナルで `uv run python scripts/setup_login.py` を実行し、許可するメールアドレス・パスワード・クライアント ID とシークレットを入れる（手元の .env と Vercel の両方に保存される。値は画面に出ない）
-
 ## 手元で動かす
 
 ```sh
 uv sync                 # 必要なものを入れる
-uv run python app.py    # http://localhost:5001 で開く（Google ログインはこのアドレスで）
+uv run python app.py    # http://127.0.0.1:5001 で開く
 uv run pytest           # 自動テスト（本物のシートは使わない）
 ```
 
@@ -72,4 +63,5 @@ Vercel の画面（Settings → Environment Variables）で次の2つを設定�
 
 ## 注意
 
+- ログイン機能はありません。URL を知っている人は誰でも登録・編集できます。
 - 鍵ファイル（`credentials/`）と `.env` は GitHub に上げません（`.gitignore` で除外済み）。

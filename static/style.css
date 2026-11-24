@@ -132,16 +132,3 @@ select.input { appearance: none; -webkit-appearance: none; background-image: lin
   .cal-nav .btn { padding: 0 10px; }
   .form-actions .btn { flex: 1; min-height: 44px; }
 }
-
-/* ログイン */
-.bar-actions { display: flex; align-items: center; gap: 8px; }
-.bar-actions form { margin: 0; }
-.login { max-width: 400px; margin: 24px auto 0; display: grid; gap: 22px; }
-.login h1 { margin: 0; font-size: 20px; font-weight: 400; letter-spacing: .12em; text-align: center; padding-bottom: 14px; border-bottom: 1px solid var(--ink); }
-.login-message { margin: 0; padding: 10px 14px; border-left: 2px solid var(--accent); background: var(--surface); color: var(--accent); font-size: 14px; }
-.btn.google { min-height: 48px; gap: 10px; background: var(--surface); font-size: 14px; }
-.g-mark { width: 18px; height: 18px; }
-.or { display: flex; align-items: center; gap: 12px; color: var(--sub); font-size: 12px; letter-spacing: .14em; }
-.or::before, .or::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
-.login-form { display: grid; gap: 18px; }
-.btn.wide { min-height: 48px; font-size: 14px; }
