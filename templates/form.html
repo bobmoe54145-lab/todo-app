@@ -1,35 +1,59 @@
 {% extends "base.html" %}
-{% block title %}{{ '登録' if mode == 'new' else '編集' }} | やることリスト{% endblock %}
+{% block title %}{{ '登録' if mode == 'new' else '編集' }} | ToDoリスト{% endblock %}
+{% block header_action %}{% endblock %}
 {% block content %}
-<div class="narrow">
-<div class="page-head">
-  <h1>{{ 'やることを登録' if mode == 'new' else 'やることを編集' }}</h1>
-</div>
-
-{% if errors %}
-<ul class="errors">
-  {% for e in errors %}<li>{{ e }}</li>{% endfor %}
-</ul>
-{% endif %}
-
 <form method="post" class="todo-form"
       action="{{ url_for('new', **nav) if mode == 'new' else url_for('edit', todo_id=todo.id, **nav) }}">
-  <label>
-    <span>タイトル <em class="required">必須</em></span>
-    <input type="text" name="title" value="{{ todo.title }}" maxlength="100" required autofocus>
-  </label>
-  <label>
-    <span>内容</span>
-    <textarea name="content" rows="6" maxlength="2000">{{ todo.content }}</textarea>
-  </label>
-  <label>
-    <span>期日</span>
-    <input type="date" name="due_date" value="{{ todo.due_date }}">
-  </label>
+  <h1>{{ 'ToDoを登録' if mode == 'new' else 'ToDoを編集' }}</h1>
+
+  {% if errors %}
+  <ul class="errors">
+    {% for e in errors %}<li>{{ e }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+
+  <div class="field">
+    <label class="label" for="title">タイトル<em>必須</em></label>
+    <input class="input" type="text" id="title" name="title" value="{{ todo.title }}" maxlength="100" required autofocus placeholder="例：冬服を整理する">
+  </div>
+  <div class="field">
+    <label class="label" for="content">内容</label>
+    <textarea class="input" id="content" name="content" rows="4" maxlength="2000" placeholder="メモがあれば">{{ todo.content }}</textarea>
+  </div>
+
+  <fieldset class="field">
+    <legend class="label">いつやる？</legend>
+    <div class="kinds">
+      <label><input type="radio" name="kind" value="day"{% if choices.kind == 'day' %} checked{% endif %}><span>その日に</span><small>日付を決める</small></label>
+      <label><input type="radio" name="kind" value="week"{% if choices.kind == 'week' %} checked{% endif %}><span>週の中で</span><small>この週のどこか</small></label>
+      <label><input type="radio" name="kind" value="month"{% if choices.kind == 'month' %} checked{% endif %}><span>月の中で</span><small>この月のどこか</small></label>
+    </div>
+  </fieldset>
+
+  {# 選んだ種類の欄だけが見える（CSS の :has で切りかえる） #}
+  <div class="field picker picker-day">
+    <label class="label" for="day">日付</label>
+    <input class="input date" type="date" id="day" name="day" value="{{ choices.selected.day }}">
+    <p class="hint">この日だけ一覧に出ます。終わらなければ次の日から「期限切れ」に出ます。</p>
+  </div>
+  <div class="field picker picker-week">
+    <label class="label" for="week">週</label>
+    <select class="input" id="week" name="week">
+      {% for w in choices.weeks %}<option value="{{ w.value }}"{% if w.value == choices.selected.week %} selected{% endif %}>{{ w.label }}</option>{% endfor %}
+    </select>
+    <p class="hint">選んだ週の毎日（日曜〜土曜）、完了するまで一覧に出ます。</p>
+  </div>
+  <div class="field picker picker-month">
+    <label class="label" for="month">月</label>
+    <select class="input" id="month" name="month">
+      {% for m in choices.months %}<option value="{{ m.value }}"{% if m.value == choices.selected.month %} selected{% endif %}>{{ m.label }}</option>{% endfor %}
+    </select>
+    <p class="hint">選んだ月の毎日、完了するまで一覧に出ます。</p>
+  </div>
+
   <div class="form-actions">
     <a class="btn" href="{{ url_for('index', **nav) }}">キャンセル</a>
-    <button class="btn primary" type="submit">{{ '登録する' if mode == 'new' else '保存する' }}</button>
+    <button class="btn fill" type="submit">{{ '登録する' if mode == 'new' else '保存する' }}</button>
   </div>
 </form>
-</div>
 {% endblock %}

@@ -1,64 +1,51 @@
 {% extends "base.html" %}
 {% macro nav_fields() %}{% for k, v in nav.items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}{% endmacro %}
-{% macro card(t) %}
-      {% set status = t.due_date|due_status %}
-      <article class="card {{ status }}">
-        <div class="card-main">
-          <div class="meta">
-            {% if t.due_date %}{{ t.due_date|due_label }}{% else %}期日なし{% endif %}
-            {% if status == 'overdue' %}<span class="tag overdue">期限切れ</span>{% elif status == 'today' %}<span class="tag today">今日</span>{% endif %}
-          </div>
-          <h3 class="title">{{ t.title }}</h3>
-          {% if t.content %}<p class="content">{{ t.content }}</p>{% endif %}
-        </div>
-        <div class="actions">
-          <form method="post" action="{{ url_for('done', todo_id=t.id) }}">
-            {{ nav_fields() }}
-            <button class="btn small done" type="submit">完了</button>
-          </form>
-          <a class="btn small" href="{{ url_for('edit', todo_id=t.id, **nav) }}">編集</a>
-        </div>
-      </article>
+{% macro item(t) %}
+  {% set over = t|is_overdue %}
+  <article class="item{% if over %} overdue{% endif %}">
+    <div class="item-main">
+      <div class="meta">
+        {% if t.kind == 'week' %}<span class="kind">週</span>{% elif t.kind == 'month' %}<span class="kind">月</span>{% endif %}
+        <span>{{ t|when_label }}</span>
+        {% if over %}<span class="tag">期限切れ</span>{% endif %}
+      </div>
+      <h3 class="title">{{ t.title }}</h3>
+      {% if t.content %}<p class="content">{{ t.content }}</p>{% endif %}
+    </div>
+    <div class="actions">
+      <form method="post" action="{{ url_for('done', todo_id=t.id) }}">
+        {{ nav_fields() }}
+        <button class="check" type="submit">完了</button>
+      </form>
+      <a class="btn text" href="{{ url_for('edit', todo_id=t.id, **nav) }}">編集</a>
+    </div>
+  </article>
 {% endmacro %}
+
 {% block content %}
-<div class="page-head">
-  <h1>一覧</h1>
-  <a class="btn primary" href="{{ url_for('new', **nav) }}">＋ 登録する</a>
-</div>
-
-{% if done_todo %}
-  <div class="notice done-notice" role="status">
-    <span>「{{ done_todo.title }}」を完了しました。</span>
-    <form method="post" action="{{ url_for('undo', todo_id=done_todo.id) }}">
-      {{ nav_fields() }}
-      <button class="btn small" type="submit">元に戻す</button>
-    </form>
-  </div>
-{% elif request.args.get('saved') == 'added' %}
-  <p class="notice" role="status">登録しました。</p>
-{% elif request.args.get('saved') == 'updated' %}
-  <p class="notice" role="status">保存しました。</p>
-{% elif request.args.get('saved') == 'undone' %}
-  <p class="notice" role="status">元に戻しました。</p>
-{% endif %}
-
 <section class="cal {{ cal.mode }}" aria-label="カレンダー">
   <div class="cal-head">
-    <strong>{{ cal.label }}</strong>
+    <span class="range">{{ cal.label }}{% if cal.sub %}<small>{{ cal.sub }}</small>{% endif %}</span>
+    <span class="periods">
+      {% for p in cal.periods %}<span>{{ p.label }} <b>{{ p.count }}件</b></span>{% endfor %}
+    </span>
     <div class="cal-nav">
-      <a class="icon-btn" href="{{ cal.prev_url }}" aria-label="{{ '前の月' if cal.mode == 'month' else '前の週' }}">◀</a>
-      <a class="btn small" href="{{ cal.today_url }}">{{ cal.today_label }}</a>
-      <a class="icon-btn" href="{{ cal.next_url }}" aria-label="{{ '次の月' if cal.mode == 'month' else '次の週' }}">▶</a>
-      <a class="btn small" href="{{ cal.switch_url }}">{{ cal.switch_label }}</a>
+      <a class="arrow" href="{{ cal.prev_url }}" aria-label="{{ cal.prev_label }}">←</a>
+      <a class="btn" href="{{ cal.today_url }}">{{ cal.today_label }}</a>
+      <a class="arrow" href="{{ cal.next_url }}" aria-label="{{ cal.next_label }}">→</a>
+      <a class="btn" href="{{ cal.switch_url }}">{{ cal.switch_label }}</a>
     </div>
   </div>
-  <div class="grid7">
-    {% for w in "日月火水木金土" %}<div class="dow dow-{{ loop.index0 }}">{{ w }}</div>{% endfor %}
+  <div class="days">
+    {% if cal.mode == 'month' %}
+      {% for w in "日月火水木金土" %}<div class="dow{% if loop.first or loop.last %} weekend{% endif %}">{{ w }}</div>{% endfor %}
+    {% endif %}
     {% for d in cal.days %}
-      <a class="day dow-{{ d.dow }}{% if d.today %} today{% endif %}{% if d.selected %} selected{% endif %}{% if d.out %} out{% endif %}"
-         href="{{ d.url }}" aria-label="{{ d.date|due_label }} やること{{ d.count }}件"{% if d.selected %} aria-current="date"{% endif %}>
-        <span class="n">{{ d.day }}</span>
-        <span class="count{% if d.overdue %} overdue{% endif %}{% if not d.count %} zero{% endif %}">{{ d.count }}</span>
+      <a class="day{% if d.dow in (0, 6) %} weekend{% endif %}{% if d.today %} today{% endif %}{% if d.selected %} selected{% endif %}{% if d.out %} out{% endif %}"
+         href="{{ d.url }}" aria-label="{{ d.label }} その日にやるToDo {{ d.count }}件"{% if d.selected %} aria-current="date"{% endif %}>
+        {% if cal.mode == 'week' %}<span class="dow-label">{{ "日月火水木金土"[d.dow] }}</span>{% endif %}
+        <span class="num">{{ d.day }}</span>
+        <span class="mark{% if d.overdue %} overdue{% endif %}">{% if d.count %}{{ d.count }}件{% endif %}</span>
       </a>
     {% endfor %}
   </div>
@@ -67,29 +54,43 @@
 <section class="list">
   <div class="list-head">
     {% if cal.selected %}
-      <h2>{{ cal.selected.isoformat()|due_label }}のやること{% if not overdue %} <span class="count-text">{{ todos|length }}件</span>{% endif %}</h2>
-      <a class="btn small" href="{{ all_url }}">すべて表示</a>
+      <h2>{{ cal.selected.isoformat()|due_label }}のToDo</h2>
+      <a class="btn text" href="{{ all_url }}">すべて表示</a>
     {% else %}
-      <h2>すべてのやること <span class="count-text">{{ todos|length }}件</span></h2>
+      <h2>すべてのToDo</h2>
     {% endif %}
   </div>
-
-  {% if overdue %}
-  <h3 class="group-head overdue">期限切れ <span class="count-text">{{ overdue|length }}件</span></h3>
-  <div class="cards">{% for t in overdue %}{{ card(t) }}{% endfor %}</div>
-  <h3 class="group-head">今日 <span class="count-text">{{ todos|length }}件</span></h3>
-  {% if todos %}
-  <div class="cards">{% for t in todos %}{{ card(t) }}{% endfor %}</div>
-  {% else %}
-  <p class="group-empty">今日が期日のやることはありません。</p>
-  {% endif %}
-  {% elif todos %}
-  <div class="cards">{% for t in todos %}{{ card(t) }}{% endfor %}</div>
-  {% else %}
-  <div class="empty">
-    <p>{{ 'この日のやることはありません。' if cal.selected else 'やることはありません。' }}</p>
-    <a class="btn primary" href="{{ url_for('new', **nav) }}">＋ 登録する</a>
+  <div class="groups">
+    {% for g in groups %}
+    <div class="group">
+      <div class="group-head{% if g.overdue %} overdue{% endif %}">
+        <strong>{{ g.name }}</strong>
+        {% if g.sub %}<span>{{ g.sub }}</span>{% endif %}
+        <span>{{ g['items']|length }}件</span>
+      </div>
+      {% if g['items'] %}
+        <div class="items">{% for t in g['items'] %}{{ item(t) }}{% endfor %}</div>
+      {% else %}
+        <p class="group-empty">{{ g.empty }}</p>
+      {% endif %}
+    </div>
+    {% endfor %}
   </div>
-  {% endif %}
 </section>
+{% endblock %}
+
+{% block toast %}
+  {% if done_todo %}
+    <div class="toast" role="status">
+      <span>「{{ done_todo.title }}」を完了しました</span>
+      <form method="post" action="{{ url_for('undo', todo_id=done_todo.id) }}">
+        {{ nav_fields() }}
+        <button type="submit">元に戻す</button>
+      </form>
+    </div>
+  {% elif request.args.get('saved') in ('added', 'updated', 'undone') %}
+    <div class="toast" role="status">
+      <span>{{ {'added': '登録しました', 'updated': '保存しました', 'undone': '元に戻しました'}[request.args.get('saved')] }}</span>
+    </div>
+  {% endif %}
 {% endblock %}

@@ -17,6 +17,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 3. GitHub（公開リポジトリ）に push、Vercel で公開（完了 2026-11-21）
 4. 完了ボタン・カレンダー（週の帯＋月表示）・日本語の見出し（完了 2026-11-24）
 5. 今日を選んでいるときは期限切れも見出しを分けて上に出す（完了 2026-11-24）
+6. 名前を「ToDoリスト」に、デザインを「生成り × えんじ」（配色3案から案1）に。ToDo を「その日／週の中／月の中」の3種類に分けた（完了 2026-11-24）。見本 Artifact：https://claude.ai/artifact/AKH7udCg159mLKD7PRqZ7P
 
 公開先：https://todo-app-ten-chi-73.vercel.app
 GitHub：https://github.com/bobmoe54145-lab/todo-app（公開）
@@ -31,6 +32,7 @@ GitHub：https://github.com/bobmoe54145-lab/todo-app（公開）
 ## 動作確認のルール
 
 - 画面の確認は、偽物のシートにサンプルを入れたサーバーで行う（本物のシートを使わない）。
+- デザインは生成り × えんじ。えんじ（`--accent`）は「＋ 登録」と期限切れだけに使う。角 2px・影なし・細い線で区切る。
 - 本物のシートで確かめるときは、確認用に作ったシートを使い、提出用のシートに確認データを残さない。
 
 ## Architecture
@@ -39,9 +41,11 @@ GitHub：https://github.com/bobmoe54145-lab/todo-app（公開）
 - `sheets.py`：`TodoStore` がシートの読み書き。書き込みは `value_input_option="RAW"`（日付が勝手に変換されない、`=` で始まる入力が数式にならない）。
 - 一覧の表示状態は URL のパラメータ（`d` 選んだ日 / `all`、`w` 週、`view=month`、`m` 月）。`nav_from()` で検証し、完了・編集・登録のリンクとフォームに引き継ぐ。カレンダーの組み立ては `build_calendar()`（日曜始まり）。
 - `templates/`：`index.html`（カレンダー＋一覧）、`form.html`（登録・編集を共通で使う）、`message.html`（404 など）。
-- シートの列：A=ID B=タイトル C=内容 D=期日 E=作成日時 F=更新日時 G=完了日時（見出しは日本語の `HEADERS`、コードでは英語の `KEYS`）。完了は G に日時を書くだけで行は消さない。
-- 列を増やすときは `sheets.HEADERS`/`KEYS`・`add` の値の数・見出しの範囲（A1:G1）・テンプレート・テストを一緒に直す。
-- 2026-11-24 に本物のシートの見出しを英語→日本語へ `migrate_headers()` で移行した（移行前のコピーをタブ「バックアップ」に残した）。
+- シートの列：A=ID B=タイトル C=内容 D=種類（日/週/月） E=期日 F=作成日時 G=更新日時 H=完了日時（見出しは日本語の `HEADERS`、コードでは英語の `KEYS`、種類はコードでは day/week/month）。完了は H に日時を書くだけで行は消さない。
+- 期日はどの種類でも「この日までに」（週＝その週の土曜、月＝末日）。週は日曜始まり。期日 < 今日 なら期限切れ（種類に関係なく今日の一覧の先頭に出る）。一覧のまとまりは `build_groups()`、登録画面の週・月の選択肢は `form_choices()`。
+- 登録画面の日付・週・月の欄の切りかえは CSS の `:has()` だけで行う（JS なし）。
+- 列を増やすときは `sheets.HEADERS`/`KEYS`・`add`/`update` の範囲・見出しの範囲（A1:H1）・テンプレート・テストを一緒に直す。
+- 2026-11-24 に本物のシートを2回移行した：見出しを英語→日本語、そのあと `migrate_add_kind()` で「種類」の列を D に挿入（どちらも移行前のコピーをバックアップのタブに残した）。
 - 鍵：手元は `GOOGLE_SERVICE_ACCOUNT_FILE`（ファイルの場所）、Vercel は `GOOGLE_SERVICE_ACCOUNT_JSON`（中身）。
 
 ## ハマりどころ

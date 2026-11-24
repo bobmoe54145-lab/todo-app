@@ -1,11 +1,18 @@
-"""Todo リストの Web アプリ（Flask）。
+"""ToDo リストの Web アプリ（Flask）。
 
 ページ：
-  /                    一覧（上に1週間の帯 or 月のカレンダー、下にやること）
-  /new                 やることの登録
-  /todos/<id>/edit     やることの編集
+  /                    一覧（上に1週間の帯 or 月のカレンダー、下に ToDo）
+  /new                 ToDo の登録
+  /todos/<id>/edit     ToDo の編集
   /todos/<id>/done     完了にする（POST）
   /todos/<id>/undo     完了を元に戻す（POST）
+
+ToDo の種類（kind）：
+  day   その日にやる。その日だけ出る
+  week  その週の中でやる（日曜〜土曜）。その週の毎日、完了するまで出る
+  month その月の中でやる。その月の毎日、完了するまで出る
+期日（due_date）はどの種類でも「この日までに」の日付（週＝土曜、月＝末日）。
+期日を過ぎて完了していないものは、今日の一覧の「期限切れ」に出続ける。
 
 一覧の表示の状態は URL のパラメータで持つ（完了・編集のあとも同じ表示に戻すため）：
   d    選んでいる日（YYYY-MM-DD）。"all" ならすべて表示。ないときは今日
@@ -26,6 +33,7 @@ load_dotenv()
 TITLE_MAX = 100
 CONTENT_MAX = 2000
 WEEKDAYS = "月火水木金土日"  # date.weekday() の順（月曜=0）
+KINDS = ("day", "week", "month")
 
 
 def today_jst() -> date:
@@ -49,6 +57,33 @@ def week_start(d: date) -> date:
     return d - timedelta(days=(d.weekday() + 1) % 7)
 
 
+def week_end(d: date) -> date:
+    """d を含む週の土曜日"""
+    return week_start(d) + timedelta(days=6)
+
+
+def month_end(d: date) -> date:
+    """d を含む月の末日"""
+    return (d.replace(day=1) + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+
+
+def deadline_for(kind: str, d: date) -> date:
+    """種類と、その期間の中の1日から、期日（この日までに）を決める"""
+    if kind == "week":
+        return week_end(d)
+    if kind == "month":
+        return month_end(d)
+    return d
+
+
+def jp_date(d: date) -> str:
+    """2026-11-20 → 11/20（金）"""
+    text = f"{d.month}/{d.day}（{WEEKDAYS[d.weekday()]}）"
+    if d.year != today_jst().year:
+        text = f"{d.year}/" + text
+    return text
+
+
 def nav_from(args) -> dict:
     """URL のパラメータから、一覧の表示の状態を取り出す（おかしな値は捨てる）"""
     nav = {}
@@ -65,11 +100,16 @@ def nav_from(args) -> dict:
 
 
 def validate(form) -> tuple[dict, list[str]]:
-    """入力を整えて確かめる。戻り値は（整えた値, エラーメッセージの一覧）。"""
+    """入力を整えて確かめる。戻り値は（保存する値, エラーメッセージの一覧）。
+
+    フォームの項目：title, content, kind（day/week/month）,
+    day（YYYY-MM-DD）, week（その週の日曜 YYYY-MM-DD）, month（YYYY-MM）
+    """
     values = {
         "title": form.get("title", "").strip(),
         "content": form.get("content", "").strip(),
-        "due_date": form.get("due_date", "").strip(),
+        "kind": form.get("kind", "day"),
+        "due_date": "",
     }
     errors = []
     if not values["title"]:
@@ -78,18 +118,64 @@ def validate(form) -> tuple[dict, list[str]]:
         errors.append(f"タイトルは{TITLE_MAX}文字以内にしてください。")
     if len(values["content"]) > CONTENT_MAX:
         errors.append(f"内容は{CONTENT_MAX}文字以内にしてください。")
-    if values["due_date"] and parse_date(values["due_date"]) is None:
-        errors.append("期日は正しい日付で入力してください。")
+
+    kind = values["kind"]
+    if kind not in KINDS:
+        errors.append("いつやるかを選んでください。")
+        values["kind"] = "day"
+    else:
+        picked = (
+            parse_month(form.get("month", "")) if kind == "month"
+            else parse_date(form.get(kind, ""))
+        )
+        if picked is None:
+            errors.append({"day": "日付", "week": "週", "month": "月"}[kind] + "を選んでください。")
+        else:
+            values["due_date"] = deadline_for(kind, picked).isoformat()
     return values, errors
 
 
+def form_choices(todo: dict, base: date) -> dict:
+    """登録・編集画面の「週」「月」の選択肢と、最初に選ばれている値"""
+    due = parse_date(todo.get("due_date", ""))
+    kind = todo.get("kind", "week")
+    # 最初に選ばれている日付・週・月（編集なら今の値、登録なら選んでいた日）
+    pick = due if due else base
+    selected = {
+        "day": pick.isoformat(),
+        "week": week_start(pick).isoformat(),
+        "month": pick.strftime("%Y-%m"),
+    }
+    today = today_jst()
+    first_week = min(week_start(today), week_start(pick))
+    weeks = []
+    for i in range(((week_start(pick) - first_week).days // 7) + 12):
+        s = first_week + timedelta(days=7 * i)
+        prefix = "今週　" if s == week_start(today) else "来週　" if s == week_start(today) + timedelta(days=7) else ""
+        weeks.append({"value": s.isoformat(), "label": f"{prefix}{jp_date(s)}〜{jp_date(s + timedelta(days=6))}"})
+    first_month = min(today.replace(day=1), pick.replace(day=1))
+    months = []
+    m = first_month
+    while len(months) < 12 or m <= pick.replace(day=1):
+        prefix = "今月　" if m == today.replace(day=1) else ""
+        if m == month_end(today) + timedelta(days=1):
+            prefix = "来月　"
+        months.append({"value": m.strftime("%Y-%m"), "label": f"{prefix}{m.year}年{m.month}月"})
+        m = month_end(m) + timedelta(days=1)
+    return {"kind": kind, "selected": selected, "weeks": weeks, "months": months}
+
+
 def build_calendar(todos: list[dict], nav: dict, today: date) -> dict:
-    """カレンダー（週の帯 or 月）の表示に必要なものをまとめる"""
+    """カレンダー（週の帯 or 月）の表示に必要なものをまとめる。
+    各日の件数は「その日にやる」ToDo だけを数える。週・月の ToDo は別に数える。"""
     selected = None if nav.get("d") == "all" else (parse_date(nav.get("d", "")) or today)
-    by_day: dict[str, list[dict]] = {}
+    by_day: dict[str, int] = {}
     for t in todos:
-        if parse_date(t["due_date"]):
-            by_day.setdefault(t["due_date"], []).append(t)
+        if t["kind"] == "day" and parse_date(t["due_date"]):
+            by_day[t["due_date"]] = by_day.get(t["due_date"], 0) + 1
+
+    def count(kind: str, due: date) -> int:
+        return sum(1 for t in todos if t["kind"] == kind and t["due_date"] == due.isoformat())
 
     def link(**changes):
         params = {**nav, **changes}
@@ -97,16 +183,17 @@ def build_calendar(todos: list[dict], nav: dict, today: date) -> dict:
 
     def day_info(d: date, out: bool = False) -> dict:
         key = d.isoformat()
-        items = by_day.get(key, [])
+        n = by_day.get(key, 0)
         return {
             "date": key,
             "day": d.day,
             "dow": (d.weekday() + 1) % 7,  # 0=日曜 … 6=土曜
-            "count": len(items),
-            "overdue": bool(items) and d < today,
+            "count": n,
+            "overdue": bool(n) and d < today,
             "today": d == today,
             "selected": d == selected,
             "out": out,
+            "label": jp_date(d),
             # 選んでいる日をもう一度押したら「すべて表示」に戻す
             "url": link(d="all" if d == selected else key),
         }
@@ -114,18 +201,22 @@ def build_calendar(todos: list[dict], nav: dict, today: date) -> dict:
     if nav.get("view") == "month":
         first = parse_month(nav.get("m", "")) or (selected or today).replace(day=1)
         start = week_start(first)
-        next_first = (first + timedelta(days=32)).replace(day=1)
-        last = next_first - timedelta(days=1)
-        end = week_start(last) + timedelta(days=6)
+        last = month_end(first)
+        end = week_end(last)
         days = [day_info(start + timedelta(days=i), out=(start + timedelta(days=i)).month != first.month)
                 for i in range((end - start).days + 1)]
         prev_first = (first - timedelta(days=1)).replace(day=1)
+        next_first = last + timedelta(days=1)
         return {
             "mode": "month",
-            "label": f"{first.year}年{first.month}月",
+            "label": f"{first.year}.{first.month}",
+            "sub": "",
+            "periods": [{"label": f"{first.month}月中", "count": count("month", last)}],
             "days": days,
             "prev_url": link(m=prev_first.strftime("%Y-%m")),
             "next_url": link(m=next_first.strftime("%Y-%m")),
+            "prev_label": "前の月",
+            "next_label": "次の月",
             "today_url": url_for("index", view="month"),
             "today_label": "今日",
             "switch_url": link(view="", m="", w=(selected or first).isoformat()),
@@ -135,18 +226,68 @@ def build_calendar(todos: list[dict], nav: dict, today: date) -> dict:
 
     start = week_start(parse_date(nav.get("w", "")) or selected or today)
     end = start + timedelta(days=6)
+    month_ref = selected if selected and start <= selected <= end else start
     return {
         "mode": "week",
-        "label": f"{start.month}/{start.day} 〜 {end.month}/{end.day}",
+        "label": f"{start.month}.{start.day} — {end.month}.{end.day}",
+        "sub": str(start.year),
+        "periods": [
+            {"label": "この週中", "count": count("week", end)},
+            {"label": f"{month_ref.month}月中", "count": count("month", month_end(month_ref))},
+        ],
         "days": [day_info(start + timedelta(days=i)) for i in range(7)],
         "prev_url": link(w=(start - timedelta(days=7)).isoformat()),
         "next_url": link(w=(start + timedelta(days=7)).isoformat()),
+        "prev_label": "前の週",
+        "next_label": "次の週",
         "today_url": url_for("index"),
         "today_label": "今週",
         "switch_url": link(view="month", w="", m=(selected or start).strftime("%Y-%m")),
         "switch_label": "月表示",
         "selected": selected,
     }
+
+
+def build_groups(todos: list[dict], selected: date | None, today: date) -> list[dict]:
+    """一覧に出すまとまり（期限切れ・その日・週・月）を作る。todos は期日が近い順。"""
+    today_key = today.isoformat()
+    overdue = [t for t in todos if parse_date(t["due_date"]) and t["due_date"] < today_key]
+    groups = []
+
+    if selected is None:
+        # すべて表示
+        rest = [t for t in todos if t not in overdue]
+        if overdue:
+            groups.append({"name": "期限切れ", "sub": "", "items": overdue, "overdue": True})
+        for kind, name, sub in (("day", "その日にやる", "日付が近い順"),
+                                ("week", "週の中でやる", "週が近い順"),
+                                ("month", "月の中でやる", "月が近い順")):
+            groups.append({"name": name, "sub": sub, "items": [t for t in rest if t["kind"] == kind],
+                           "empty": "ありません"})
+        return groups
+
+    is_today = selected == today
+    s_week_end, s_month_end = week_end(selected), month_end(selected)
+    if is_today and overdue:
+        groups.append({"name": "期限切れ", "sub": "", "items": overdue, "overdue": True})
+
+    def pick(kind: str, due: date) -> list[dict]:
+        items = [t for t in todos if t["kind"] == kind and t["due_date"] == due.isoformat()]
+        # 今日の一覧では、期限切れに出したものは重ねて出さない
+        return [t for t in items if t not in overdue] if is_today else items
+
+    this_week = week_start(selected) == week_start(today)
+    this_month = selected.replace(day=1) == today.replace(day=1)
+    groups.append({"name": "今日やること" if is_today else "この日にやること", "sub": "",
+                   "items": pick("day", selected),
+                   "empty": "今日やることはありません" if is_today else "この日にやることはありません"})
+    ws = week_start(selected)
+    groups.append({"name": "今週中" if this_week else "この週中",
+                   "sub": f"{ws.month}/{ws.day}〜{s_week_end.month}/{s_week_end.day}",
+                   "items": pick("week", s_week_end), "empty": "この週にやることはありません"})
+    groups.append({"name": "今月中" if this_month else "この月中", "sub": f"{selected.month}月",
+                   "items": pick("month", s_month_end), "empty": "この月にやることはありません"})
+    return groups
 
 
 def create_app(store_factory=None) -> Flask:
@@ -163,42 +304,34 @@ def create_app(store_factory=None) -> Flask:
 
     @app.template_filter("due_label")
     def due_label(due: str) -> str:
-        """期日の見た目：2026-11-20 → 11/20（金）"""
         d = parse_date(due)
-        if d is None:
-            return due  # シートを手で直して日付の形が崩れていても、そのまま表示する
-        text = f"{d.month}/{d.day}（{WEEKDAYS[d.weekday()]}）"
-        if d.year != today_jst().year:
-            text = f"{d.year}/" + text
-        return text
+        return jp_date(d) if d else due  # 形が崩れていても、そのまま表示する
 
-    @app.template_filter("due_status")
-    def due_status(due: str) -> str:
-        """期限切れ・今日が期日、を色分けするための目印"""
-        d = parse_date(due)
+    @app.template_filter("when_label")
+    def when_label(t: dict) -> str:
+        """ToDo のいつまでか：その日＝11/24（火）／週＝11/22〜11/28（土）まで／月＝11月中（11/30（月）まで）"""
+        d = parse_date(t["due_date"])
         if d is None:
-            return ""
-        today = today_jst()
-        if d < today:
-            return "overdue"
-        if d == today:
-            return "today"
-        return ""
+            return t["due_date"] or "期日なし"
+        if t["kind"] == "week":
+            s = d - timedelta(days=6)
+            return f"{s.month}/{s.day}〜{jp_date(d)}まで"
+        if t["kind"] == "month":
+            return f"{d.month}月中（{jp_date(d)}まで）"
+        return jp_date(d)
+
+    @app.template_filter("is_overdue")
+    def is_overdue(t: dict) -> bool:
+        d = parse_date(t["due_date"])
+        return bool(d) and d < today_jst()
 
     @app.get("/")
     def index():
         nav = nav_from(request.args)
         todos = store().list_active()
-        cal = build_calendar(todos, nav, today_jst())
-        if cal["selected"]:
-            shown = [t for t in todos if t["due_date"] == cal["selected"].isoformat()]
-        else:
-            shown = todos
-        # 今日を選んでいるときは、期限切れのやることも上に出す（期日が古い順）
-        overdue = []
-        if cal["selected"] == today_jst():
-            today_key = today_jst().isoformat()
-            overdue = [t for t in todos if parse_date(t["due_date"]) and t["due_date"] < today_key]
+        today = today_jst()
+        cal = build_calendar(todos, nav, today)
+        groups = build_groups(todos, cal["selected"], today)
         # 完了した直後なら「元に戻す」を出す
         done_todo = None
         done_id = request.args.get("done")
@@ -207,9 +340,12 @@ def create_app(store_factory=None) -> Flask:
             if t and t["done_at"]:
                 done_todo = t
         return render_template(
-            "index.html", cal=cal, todos=shown, overdue=overdue, nav=nav, done_todo=done_todo,
+            "index.html", cal=cal, groups=groups, nav=nav, done_todo=done_todo,
             all_url=url_for("index", **{**nav, "d": "all"}),
         )
+
+    def base_date(nav: dict) -> date:
+        return parse_date(nav.get("d", "")) or today_jst()
 
     @app.route("/new", methods=["GET", "POST"])
     def new():
@@ -219,12 +355,13 @@ def create_app(store_factory=None) -> Flask:
             if not errors:
                 store().add(**values)
                 return redirect(url_for("index", **nav, saved="added"))
-            return render_template("form.html", mode="new", todo=values, errors=errors, nav=nav), 400
-        empty = {"title": "", "content": "", "due_date": ""}
-        # 日付を選んでいる状態から登録するときは、その日を期日に入れておく
-        if parse_date(nav.get("d", "")):
-            empty["due_date"] = nav["d"]
-        return render_template("form.html", mode="new", todo=empty, errors=[], nav=nav)
+            return render_template("form.html", mode="new", todo=values, errors=errors, nav=nav,
+                                   choices=form_choices(values, base_date(nav))), 400
+        # 日付を選んでいたら「その日」、選んでいなければ「今週中」を最初に選んでおく
+        kind = "day" if parse_date(nav.get("d", "")) and nav["d"] != today_jst().isoformat() else "week"
+        empty = {"title": "", "content": "", "kind": kind, "due_date": ""}
+        return render_template("form.html", mode="new", todo=empty, errors=[], nav=nav,
+                               choices=form_choices(empty, base_date(nav)))
 
     @app.route("/todos/<todo_id>/edit", methods=["GET", "POST"])
     def edit(todo_id):
@@ -238,8 +375,12 @@ def create_app(store_factory=None) -> Flask:
                 store().update(todo_id, **values)
                 return redirect(url_for("index", **nav, saved="updated"))
             values["id"] = todo_id
-            return render_template("form.html", mode="edit", todo=values, errors=errors, nav=nav), 400
-        return render_template("form.html", mode="edit", todo=todo, errors=[], nav=nav)
+            if not values["due_date"]:
+                values["due_date"] = todo["due_date"]
+            return render_template("form.html", mode="edit", todo=values, errors=errors, nav=nav,
+                                   choices=form_choices(values, base_date(nav))), 400
+        return render_template("form.html", mode="edit", todo=todo, errors=[], nav=nav,
+                               choices=form_choices(todo, base_date(nav)))
 
     @app.post("/todos/<todo_id>/done")
     def done(todo_id):
@@ -255,7 +396,7 @@ def create_app(store_factory=None) -> Flask:
 
     @app.errorhandler(404)
     def not_found(_):
-        return render_template("message.html", message="そのやることは見つかりませんでした。"), 404
+        return render_template("message.html", message="そのToDoは見つかりませんでした。"), 404
 
     @app.errorhandler(500)
     def server_error(_):

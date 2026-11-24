@@ -29,6 +29,17 @@ class FakeWorksheet:
         assert value_input_option == "RAW"
         self.rows.append([str(v) for v in values])
 
+    def insert_cols(self, values, col=1, value_input_option=None):
+        assert value_input_option == "RAW"
+        for c_off, column in enumerate(values):
+            for r, v in enumerate(column):
+                while len(self.rows) <= r:
+                    self.rows.append([])
+                row = self.rows[r]
+                while len(row) < col - 1:
+                    row.append("")
+                row.insert(col - 1 + c_off, str(v))
+
     def update(self, values, range_name, value_input_option=None):
         assert value_input_option == "RAW"
         m = re.fullmatch(r"([A-Z])(\d+)(?::([A-Z])(\d+))?", range_name)
