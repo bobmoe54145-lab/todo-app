@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ToDoリスト</title>
+  <meta name="theme-color" content="#fbfaf7">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="site-header"><div class="bar"><span class="logo">ToDoリスト</span></div></header>
+  <main class="wrap">
+    <div class="message">
+      <p>インターネットにつながっていません。<br>つながったら、もう一度開いてください。</p>
+      <button class="btn" type="button" onclick="location.reload()">再読み込み</button>
+    </div>
+  </main>
+</body>
+</html>

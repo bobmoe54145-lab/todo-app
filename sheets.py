@@ -1,10 +1,12 @@
 """Google スプレッドシートにやることを保存・読み込みする部分。
 
 シートの1行目は見出し（HEADERS）、2行目から1行＝ToDo 1件。
-列の順番：A=ID B=タイトル C=内容 D=種類 E=期日 F=作成日時 G=更新日時 H=完了日時
+列の順番：A=ID B=タイトル C=内容 D=種類 E=期日 F=作成日時 G=更新日時 H=完了日時 I=繰り返し J=削除日時
 
 種類：日＝その日にやる／週＝その週の中でやる（日曜〜土曜）／月＝その月の中でやる
 期日：どの種類でも「この日までにやる」日付（日＝その日、週＝その週の土曜、月＝その月の末日）
+繰り返し：空＝なし。「毎日」「毎週 月・金」「毎月 25日」「毎月 末日」（日の種類）、「毎週」（週）、「毎月」（月）
+削除日時：空でなければ削除したもの（画面には出さないが、行は残す）
 """
 
 import json
@@ -13,10 +15,10 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 # シートに表示する見出し（日本語）と、プログラムの中で使う名前（英語）。順番は同じ
-HEADERS = ["ID", "タイトル", "内容", "種類", "期日", "作成日時", "更新日時", "完了日時"]
-KEYS = ["id", "title", "content", "kind", "due_date", "created_at", "updated_at", "done_at"]
-# 以前の見出し（移行用）。種類の列がなかった
-PREV_HEADERS = ["ID", "タイトル", "内容", "期日", "作成日時", "更新日時", "完了日時"]
+HEADERS = ["ID", "タイトル", "内容", "種類", "期日", "作成日時", "更新日時", "完了日時", "繰り返し", "削除日時"]
+KEYS = ["id", "title", "content", "kind", "due_date", "created_at", "updated_at", "done_at", "repeat", "deleted_at"]
+# ひとつ前の見出し（移行用）。繰り返し・削除日時の列がなかった
+PREV_HEADERS = HEADERS[:8]
 
 # 種類：プログラムの中の名前 ⇔ シートに書く文字
 KIND_TO_SHEET = {"day": "日", "week": "週", "month": "月"}
@@ -48,20 +50,21 @@ class TodoStore:
         # 空のシートなら見出しを書く。見出しが違うシートは事故を防ぐため使わない
         first_row = self.ws.row_values(1)
         if not first_row:
-            self.ws.update(values=[HEADERS], range_name="A1:H1", value_input_option="RAW")
+            self.ws.update(values=[HEADERS], range_name="A1:J1", value_input_option="RAW")
         elif first_row[: len(HEADERS)] != HEADERS:
             raise RuntimeError(
                 f"シートの1行目が想定と違います: {first_row}（想定: {HEADERS}）。"
                 "新しい空のシートを使ってください。"
             )
 
-    def _all(self) -> list[dict]:
+    def list_all(self) -> list[dict]:
+        """削除していないやること（完了したものも含む）"""
         todos = [to_todo(row) for row in self.ws.get_all_values()[1:]]
-        return [t for t in todos if t["id"]]
+        return [t for t in todos if t["id"] and not t["deleted_at"]]
 
     def list_active(self) -> list[dict]:
         """完了していないやること。期日が近い順、期日なしは最後、同じ期日は登録が古い順"""
-        todos = [t for t in self._all() if not t["done_at"]]
+        todos = [t for t in self.list_all() if not t["done_at"]]
         return sorted(todos, key=lambda t: (t["due_date"] == "", t["due_date"], t["created_at"]))
 
     def _row_number(self, todo_id: str) -> int | None:
@@ -77,18 +80,18 @@ class TodoStore:
             return None
         return to_todo(self.ws.row_values(row))
 
-    def add(self, title: str, content: str, kind: str, due_date: str) -> str:
+    def add(self, title: str, content: str, kind: str, due_date: str, repeat: str = "") -> str:
         todo_id = uuid.uuid4().hex[:12]
         now = now_jst()
         # RAW：入力をそのまま文字として保存（"=" で始まる文字が数式にならない、日付の形が変わらない）
         self.ws.append_row(
-            [todo_id, title, content, KIND_TO_SHEET[kind], due_date, now, now, ""],
+            [todo_id, title, content, KIND_TO_SHEET[kind], due_date, now, now, "", repeat, ""],
             value_input_option="RAW",
             table_range="A1",
         )
         return todo_id
 
-    def update(self, todo_id: str, title: str, content: str, kind: str, due_date: str) -> bool:
+    def update(self, todo_id: str, title: str, content: str, kind: str, due_date: str, repeat: str = "") -> bool:
         row = self._row_number(todo_id)
         if row is None:
             return False
@@ -98,6 +101,7 @@ class TodoStore:
             value_input_option="RAW",
         )
         self.ws.update(values=[[now_jst()]], range_name=f"G{row}", value_input_option="RAW")
+        self.ws.update(values=[[repeat]], range_name=f"I{row}", value_input_option="RAW")
         return True
 
     def set_done(self, todo_id: str, done: bool) -> bool:
@@ -109,21 +113,28 @@ class TodoStore:
         self.ws.update(values=[[value]], range_name=f"H{row}", value_input_option="RAW")
         return True
 
+    def set_deleted(self, todo_id: str, deleted: bool) -> bool:
+        """削除する（削除日時を書く）／元に戻す（削除日時を消す）。行は消さない"""
+        row = self._row_number(todo_id)
+        if row is None:
+            return False
+        value = now_jst() if deleted else ""
+        self.ws.update(values=[[value]], range_name=f"J{row}", value_input_option="RAW")
+        return True
 
-def migrate_add_kind(worksheet) -> bool:
-    """「種類」の列がない以前の形のシートに、内容と期日の間へ「種類」の列を入れる。
 
-    今ある行はすべて「日」（その日にやる）にする。入れたら True、すでに新しい形なら False。
+def migrate_add_repeat(worksheet) -> bool:
+    """見出しが8列（完了日時まで）のシートに、「繰り返し」「削除日時」の見出しを足す。
+
+    列は右の端に足すだけなので、今ある行は動かない。足したら True、すでに新しい形なら False。
     どちらでもなければエラー（よく分からないシートは書きかえない）。
     """
     first_row = worksheet.row_values(1)
     if first_row[: len(HEADERS)] == HEADERS:
         return False
-    if first_row[: len(PREV_HEADERS)] != PREV_HEADERS:
+    if first_row != PREV_HEADERS:
         raise RuntimeError(f"見出しが想定と違うので書きかえません: {first_row}")
-    n_rows = len(worksheet.get_all_values())
-    column = [["種類"]] + [["日"] for _ in range(n_rows - 1)]
-    worksheet.insert_cols([[v[0] for v in column]], col=4, value_input_option="RAW")
+    worksheet.update(values=[HEADERS[8:]], range_name="I1:J1", value_input_option="RAW")
     return True
 
 

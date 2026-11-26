@@ -7,6 +7,7 @@
       <div class="meta">
         {% if t.kind == 'week' %}<span class="kind">週</span>{% elif t.kind == 'month' %}<span class="kind">月</span>{% endif %}
         <span>{{ t|when_label }}</span>
+        {% if t.repeat %}<span class="kind">↻ {{ t.repeat }}</span>{% endif %}
         {% if over %}<span class="tag">期限切れ</span>{% endif %}
       </div>
       <h3 class="title">{{ t.title }}</h3>
@@ -82,15 +83,24 @@
 {% block toast %}
   {% if done_todo %}
     <div class="toast" role="status">
-      <span>「{{ done_todo.title }}」を完了しました</span>
+      <span>「{{ done_todo.title }}」を完了しました{% if next_todo %}。次は {{ next_todo|when_label }} に出ます{% endif %}</span>
       <form method="post" action="{{ url_for('undo', todo_id=done_todo.id) }}">
+        {{ nav_fields() }}
+        {% if next_todo %}<input type="hidden" name="next" value="{{ next_todo.id }}">{% endif %}
+        <button type="submit">元に戻す</button>
+      </form>
+    </div>
+  {% elif deleted_todo %}
+    <div class="toast" role="status">
+      <span>「{{ deleted_todo.title }}」を削除しました</span>
+      <form method="post" action="{{ url_for('restore', todo_id=deleted_todo.id) }}">
         {{ nav_fields() }}
         <button type="submit">元に戻す</button>
       </form>
     </div>
-  {% elif request.args.get('saved') in ('added', 'updated', 'undone') %}
+  {% elif request.args.get('saved') in ('added', 'updated', 'undone', 'restored') %}
     <div class="toast" role="status">
-      <span>{{ {'added': '登録しました', 'updated': '保存しました', 'undone': '元に戻しました'}[request.args.get('saved')] }}</span>
+      <span>{{ {'added': '登録しました', 'updated': '保存しました', 'undone': '元に戻しました', 'restored': '元に戻しました'}[request.args.get('saved')] }}</span>
     </div>
   {% endif %}
 {% endblock %}

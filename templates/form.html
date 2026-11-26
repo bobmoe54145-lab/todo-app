@@ -51,9 +51,67 @@
     <p class="hint">選んだ月の毎日、完了するまで一覧に出ます。</p>
   </div>
 
+  {# 繰り返し：「その日に」は 毎日・毎週・毎月、「週の中で」は毎週、「月の中で」は毎月だけ見える（CSS の :has） #}
+  {% set rep = choices.repeat %}
+  <fieldset class="field">
+    <legend class="label">繰り返し</legend>
+    <div class="reps">
+      <label class="rep-none"><input type="radio" name="repeat" value="none"{% if rep.type == 'none' %} checked{% endif %}>なし</label>
+      <label class="rep-daily"><input type="radio" name="repeat" value="daily"{% if rep.type == 'daily' %} checked{% endif %}>毎日</label>
+      <label class="rep-weekly"><input type="radio" name="repeat" value="weekly"{% if rep.type == 'weekly' %} checked{% endif %}>毎週</label>
+      <label class="rep-monthly"><input type="radio" name="repeat" value="monthly"{% if rep.type == 'monthly' %} checked{% endif %}>毎月</label>
+    </div>
+  </fieldset>
+  <fieldset class="field rep-detail rep-dows">
+    <legend class="label">曜日（いくつでも）</legend>
+    <div class="dows">
+      {% for w in "日月火水木金土" %}<label><input type="checkbox" name="dow" value="{{ loop.index0 }}"{% if loop.index0 in rep.dows %} checked{% endif %}><span>{{ w }}</span></label>{% endfor %}
+    </div>
+  </fieldset>
+  <div class="field rep-detail rep-dom">
+    <label class="label" for="dom">日にち</label>
+    <select class="input dom" id="dom" name="dom">
+      {% for d in choices.doms %}<option value="{{ d }}"{% if d == rep.dom %} selected{% endif %}>{{ d }}日</option>{% endfor %}
+      <option value="end"{% if rep.dom == 'end' %} selected{% endif %}>末日</option>
+    </select>
+    <p class="hint">29〜31日がない月があるので、月の終わりは「末日」を選んでください。</p>
+  </div>
+  <p class="hint rep-hint">完了すると、次の回が自動で一覧に出ます。終えた回はシートに残ります。</p>
+
   <div class="form-actions">
-    <a class="btn" href="{{ url_for('index', **nav) }}">キャンセル</a>
-    <button class="btn fill" type="submit">{{ '登録する' if mode == 'new' else '保存する' }}</button>
+    {% if mode == 'edit' %}
+    <details class="delete">
+      <summary class="btn text">このToDoを削除</summary>
+      <div class="confirm">
+        <p>「{{ todo.title }}」を削除しますか？</p>
+        <small>一覧から消えます。スプレッドシートには残るので、あとから戻せます。</small>
+        <div class="confirm-row">
+          <button class="btn" type="button" onclick="this.closest('details').open = false">やめる</button>
+          <button class="btn dark" type="submit" form="delete-form">削除する</button>
+        </div>
+      </div>
+    </details>
+    {% endif %}
+    <div class="form-buttons">
+      <a class="btn" href="{{ url_for('index', **nav) }}">キャンセル</a>
+      <button class="btn fill" type="submit">{{ '登録する' if mode == 'new' else '保存する' }}</button>
+    </div>
   </div>
 </form>
+{% if mode == 'edit' %}
+<form id="delete-form" method="post" action="{{ url_for('delete', todo_id=todo.id) }}" hidden>
+  {% for k, v in nav.items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+</form>
+{% endif %}
+<script>
+  // 種類を変えて、選んでいた繰り返しが見えなくなったら「なし」に戻す
+  document.querySelectorAll('input[name="kind"]').forEach(function (r) {
+    r.addEventListener("change", function () {
+      var picked = document.querySelector('input[name="repeat"]:checked');
+      if (picked && picked.closest("label").offsetParent === null) {
+        document.querySelector('input[name="repeat"][value="none"]').checked = true;
+      }
+    });
+  });
+</script>
 {% endblock %}

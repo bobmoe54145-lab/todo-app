@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}ふり返り | ToDoリスト{% endblock %}
+{% block content %}
+<section class="review">
+  <div class="list-head">
+    <h2>ふり返り</h2>
+    <div class="tabs" role="group" aria-label="数える単位">
+      <a href="{{ r.week_url }}"{% if r.view == 'week' %} aria-current="page"{% endif %}>週ごと</a>
+      <a href="{{ r.month_url }}"{% if r.view == 'month' %} aria-current="page"{% endif %}>月ごと</a>
+    </div>
+  </div>
+
+  <div class="review-head">
+    <span class="range">{{ r.title }}</span>
+    <div class="cal-nav">
+      <a class="arrow" href="{{ r.prev_url }}" aria-label="{{ '前の週' if r.view == 'week' else '前の月' }}">←</a>
+      {% if not r.is_current %}<a class="btn" href="{{ r.now_url }}">{{ '今週' if r.view == 'week' else '今月' }}</a>{% endif %}
+      {% if r.next_url %}<a class="arrow" href="{{ r.next_url }}" aria-label="{{ '次の週' if r.view == 'week' else '次の月' }}">→</a>{% endif %}
+    </div>
+  </div>
+
+  <div class="summary">
+    <div><b>{{ r.summary.done }}</b><span>終えた</span></div>
+    <div class="over"><b>{{ r.summary.over }}</b><span>期日を過ぎた</span></div>
+    <div><b>{{ r.summary.open }}</b><span>残っている</span></div>
+  </div>
+
+  <div class="chart">
+    <div class="legend">
+      <span><i class="ontime"></i>期日までに完了</span>
+      <span><i class="over"></i>期日を過ぎた</span>
+    </div>
+    <svg viewBox="0 0 {{ r.W }} {{ r.H }}" role="img" aria-label="{{ '週' if r.view == 'week' else '月' }}ごとの完了数のグラフ">
+      {% for t in r.ticks %}
+        <line class="grid" x1="{{ r.left }}" x2="{{ r.W }}" y1="{{ t.y }}" y2="{{ t.y }}"></line>
+        <text x="{{ r.left - 6 }}" y="{{ t.y + 3 }}" class="tick" text-anchor="end">{{ t.v }}</text>
+      {% endfor %}
+      {% for b in r.bars %}
+        <a href="{{ b.url }}" class="bar{% if b.selected %} selected{% endif %}" aria-label="{{ b.aria }}">
+          <rect class="hit" x="{{ b.hit_x }}" y="0" width="{{ b.hit_w }}" height="{{ r.H }}"></rect>
+          {% if b.ontime %}<rect class="ontime" x="{{ b.x }}" y="{{ b.y_ontime }}" width="{{ b.w }}" height="{{ b.h_ontime }}"></rect>{% endif %}
+          {% if b.over %}<rect class="over" x="{{ b.x }}" y="{{ b.y_over }}" width="{{ b.w }}" height="{{ b.h_over }}"></rect>{% endif %}
+          {% if b.total %}<text class="total" x="{{ b.cx }}" y="{{ b.y_over - 5 }}" text-anchor="middle">{{ b.total }}</text>{% endif %}
+          <text class="x-label" x="{{ b.cx }}" y="{{ r.label_y }}" text-anchor="middle">{{ b.label }}</text>
+        </a>
+      {% endfor %}
+    </svg>
+    <p class="hint">棒を押すと、その{{ '週' if r.view == 'week' else '月' }}の終えたToDoが下に出ます。</p>
+  </div>
+
+  <div class="group">
+    <div class="group-head"><strong>終えたToDo</strong><span>{{ r.title }}</span><span>{{ r.summary.done }}件</span></div>
+    {% if r.days %}
+      {% for d in r.days %}
+        <h3 class="done-day">{{ d.label }}</h3>
+        <ul class="done-list">
+          {% for t in d['items'] %}
+            {% set late = t|is_late %}
+            <li{% if late %} class="late"{% endif %}>
+              <span class="done-title">{{ t.title }}{% if t.repeat %} <span class="kind">↻ {{ t.repeat }}</span>{% endif %}</span>
+              <span class="done-when">{{ t|when_label }}{% if late %}・遅れて完了{% endif %}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% endfor %}
+    {% else %}
+      <p class="group-empty">この{{ '週' if r.view == 'week' else '月' }}に終えたToDoはありません</p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

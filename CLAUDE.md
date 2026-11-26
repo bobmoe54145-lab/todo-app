@@ -18,6 +18,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 4. 完了ボタン・カレンダー（週の帯＋月表示）・日本語の見出し（完了 2026-11-24）
 5. 今日を選んでいるときは期限切れも見出しを分けて上に出す（完了 2026-11-24）
 6. 名前を「ToDoリスト」に、デザインを「生成り × えんじ」（配色3案から案1）に。ToDo を「その日／週の中／月の中」の3種類に分けた（完了 2026-11-24）。見本 Artifact：https://claude.ai/artifact/AKH7udCg159mLKD7PRqZ7P
+7. 繰り返し・削除・ふり返り・毎朝の LINE 通知・ホーム画面に追加（PWA）（2026-11-26。見本 Artifact：https://claude.ai/artifact/J6SaG1PAyj3ytd8ZBSpLoR）
 - ログイン（Google ＋ メールとパスワード）を一度作ったが、設定の前にユーザーが「今回はやめる」と決めたので取り消した（2026-11-24、コミット d1cb21c を revert）。また入れるときは d1cb21c を戻せば復活する。
 
 公開先：https://todo-app-ten-chi-73.vercel.app
@@ -29,6 +30,7 @@ GitHub：https://github.com/bobmoe54145-lab/todo-app（公開）
 - `uv run python app.py` — 手元で起動（http://127.0.0.1:5001）
 - `uv run pytest` — 自動テスト（偽物のシート `tests/conftest.py` の FakeWorksheet を使う）
 - `npx vercel@latest --prod --yes` — 公開
+- `uv run python /private/tmp/.../demo_server.py` のような、偽物のシートにサンプルを入れたサーバー（ポート 5055）で画面を確認した。スクリプトはリポジトリに入れていない
 
 ## 動作確認のルール
 
@@ -42,10 +44,15 @@ GitHub：https://github.com/bobmoe54145-lab/todo-app（公開）
 - `sheets.py`：`TodoStore` がシートの読み書き。書き込みは `value_input_option="RAW"`（日付が勝手に変換されない、`=` で始まる入力が数式にならない）。
 - 一覧の表示状態は URL のパラメータ（`d` 選んだ日 / `all`、`w` 週、`view=month`、`m` 月）。`nav_from()` で検証し、完了・編集・登録のリンクとフォームに引き継ぐ。カレンダーの組み立ては `build_calendar()`（日曜始まり）。
 - `templates/`：`index.html`（カレンダー＋一覧）、`form.html`（登録・編集を共通で使う）、`message.html`（404 など）。
-- シートの列：A=ID B=タイトル C=内容 D=種類（日/週/月） E=期日 F=作成日時 G=更新日時 H=完了日時（見出しは日本語の `HEADERS`、コードでは英語の `KEYS`、種類はコードでは day/week/month）。完了は H に日時を書くだけで行は消さない。
+- シートの列：A=ID B=タイトル C=内容 D=種類（日/週/月） E=期日 F=作成日時 G=更新日時 H=完了日時 I=繰り返し J=削除日時（見出しは日本語の `HEADERS`、コードでは英語の `KEYS`、種類はコードでは day/week/month）。完了は H、削除は J に日時を書くだけで行は消さない。
+- 繰り返しはシートに日本語の文字（「毎週 月・金」など）で持ち、`parse_repeat()`/`repeat_text()` で読み書き。完了したときに `next_due()` で次の回を新しい行として足す（期日を過ぎてから完了したら今日以降の最初の回）。完了の「元に戻す」では、作った次の回（URL の `next`）を削除扱いにする。
+- ふり返りは `build_review()`。グラフはサーバーで SVG の座標まで計算してテンプレートに渡す（JS なし）。
+- LINE 通知は `/cron/line`。`vercel.json` の Cron（UTC 22時＝JST 7時台）が `Authorization: Bearer $CRON_SECRET` 付きで呼ぶ。送るのは Messaging API のプッシュ（`urllib` だけ、追加のライブラリなし）。テストは `create_app(line_sender=...)` で送ったふり。
+- PWA：`/sw.js`（サイトの一番上から配る）・`/manifest.webmanifest`・`/offline`。サービスワーカーはページをキャッシュしない（ToDo はいつも最新を読む）。電波がないときだけ `/offline` を出す。アイコンは `static/icons/icon.svg` から `qlmanage` と `sips` で PNG を作った。
 - 期日はどの種類でも「この日までに」（週＝その週の土曜、月＝末日）。週は日曜始まり。期日 < 今日 なら期限切れ（種類に関係なく今日の一覧の先頭に出る）。一覧のまとまりは `build_groups()`、登録画面の週・月の選択肢は `form_choices()`。
 - 登録画面の日付・週・月の欄の切りかえは CSS の `:has()` だけで行う（JS なし）。
 - 列を増やすときは `sheets.HEADERS`/`KEYS`・`add`/`update` の範囲・見出しの範囲（A1:H1）・テンプレート・テストを一緒に直す。
+- 2026-11-26 に `migrate_add_repeat()` で I・J 列の見出しを足す（右の端に足すだけなので、古い版のアプリもそのまま動く）。
 - 2026-11-24 に本物のシートを2回移行した：見出しを英語→日本語、そのあと `migrate_add_kind()` で「種類」の列を D に挿入（どちらも移行前のコピーをバックアップのタブに残した）。
 - 鍵：手元は `GOOGLE_SERVICE_ACCOUNT_FILE`（ファイルの場所）、Vercel は `GOOGLE_SERVICE_ACCOUNT_JSON`（中身）。
 
